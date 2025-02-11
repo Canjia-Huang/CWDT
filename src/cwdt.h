@@ -5,11 +5,31 @@
 #include <array>
 #include <vector>
 #include <unordered_map>
+// Gurobi
+#include "gurobi_c++.h"
 // CGAL
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::FT Weight;
 typedef K::Point_3 Point;
+#include <CGAL/Regular_triangulation_3.h>
+#include <CGAL/Regular_triangulation_vertex_base_3.h>
+#include <CGAL/Regular_triangulation_cell_base_3.h>
+typedef CGAL::Regular_triangulation_vertex_base_3<K> Vb0;
+typedef CGAL::Regular_triangulation_cell_base_3<K> Cb0;
+#include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
+#include <CGAL/Triangulation_face_base_with_info_2.h>
+#include <CGAL/Triangulation_cell_base_with_info_3.h>
+typedef CGAL::Triangulation_vertex_base_with_info_3<int, K, Vb0> Vb;
+typedef CGAL::Triangulation_cell_base_with_info_3<int, K, Cb0> Cb;
+typedef CGAL::Triangulation_data_structure_3<Vb, Cb> Tds;
+typedef CGAL::Regular_triangulation_3<K, Tds> Rt;
+typedef Rt::Vertex_iterator Vertex_iterator;
+typedef Rt::Finite_vertices_iterator Finite_vertices_iterator;
+typedef Rt::Finite_cells_iterator Finite_cells_iterator;
+typedef Rt::Vertex_handle VH;
+typedef Rt::Cell_handle CH;
 
 namespace CWDT {
 	class edge {
@@ -98,6 +118,8 @@ namespace CWDT {
 	public:
 		processor() {};
 
+		int ntri();
+
 		/** \brief Read in constrained mesh information.
 		 * \param[in] in: ifstream of input file
 		 * \return success or not */
@@ -110,9 +132,22 @@ namespace CWDT {
 		 * \param[in, out] p: polygon
 		 * \return the number of triangles after triangulation */
 		int triangulate_poly(poly& p);
+		int triangulate_cpoly_w(poly& p);
+		int triangulate();
 
 		/** \brief Get the adjacency relationship between tets, and store in tetNeighbors. */
 		void buildTetNeighbors();
+
+		int solve(int nr, 
+			double mintol, double maxtol,
+			double height_factor, double weight_factor);
+
+		int split_missing_edges();
+		int split_missing_faces();
+
+		void missing_faces(std::vector<int>& cmt);
+
+		int peel_by_winding_number(double thr);
 	private:
 		int nv_; // vertex nb
 		int np_; // polygon nb
@@ -126,6 +161,18 @@ namespace CWDT {
 		std::vector<std::array<int, 4>> tets_;
 		std::vector<std::array<int, 4>> tetNeighbors_; /* the index of the adjacent tet corresponding to each vertex in tet,
 														-1 means there is no adjacent tet */ 
+
+		std::vector<VH> id2vh_;
+		std::vector<bool> ve_;
+
+		bool gabriel_;
+
+		GRBEnv* env_;
+
+		bool minimize_heights_, write_missing_, write_max_constraints_, write_witness_;
+
+		Rt T_;
+
 	};
 }
 #endif
