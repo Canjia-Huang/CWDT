@@ -173,20 +173,81 @@ namespace CWDT {
         return true;
     }
 
+    bool processor::read_igl(const std::string& filename
+    ) {
+        Eigen::MatrixXd EV;
+        Eigen::MatrixXi F;
+        igl::read_triangle_mesh(filename, EV, F);
+        nv_ = EV.rows();
+        vertices_.resize(nv_);
+        weights_.resize(nv_, 0.0);
+        for (int i = 0; i < nv_; i++)
+            vertices_[i] = Point(EV(i, 0), EV(i, 1), EV(i, 2));
+
+        np_ = F.rows();
+        polygons_ = std::vector<poly>(np_);
+        for (int i = 0; i < np_; i++) {
+            int d = 3;
+            for (int v = 0; v < d; v++) {
+                edge e{ F(i, v), F(i, (v + 1) % d) };
+                polygons_[i].be().push_back(e);
+                E2P_[e].push_back(i);
+            }
+        }
+    }
+
+    void processor::write_off(std::string filename)
+    {
+        std::ofstream vf(filename);
+        vf << "OFF" << std::endl;
+        vf << nv_ << " " << ntri() << " 0\n";
+        for (int i = 0; i < nv_; i++)
+        {
+            vf << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
+        }
+        for (int i = 0; i < np_; i++)
+            for (int ii = 0; ii < polygons_[i].tri().size(); ii++)
+            {
+                int v0 = polygons_[i].tri()[ii][0];
+                int v1 = polygons_[i].tri()[ii][1];
+                int v2 = polygons_[i].tri()[ii][2];
+
+                vf << "3 " << v0 << " " << v1 << " " << v2 << "\n";
+            }
+        vf.close();
+    }
+
+    void processor::write_woff(std::string filename)
+    {
+        std::ofstream vf(filename);
+        vf << "WOFF" << std::endl;
+        vf << nv_ << " " << np_ << " 0" << std::endl;
+        vf << std::setprecision(std::numeric_limits<double>::max_digits10);
+        for (int i = 0; i < nv_; i++)
+        {
+            vf << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << " " << weights_[i] << std::endl;
+        }
+        for (int i = 0; i < np_; i++)
+        {
+            vf << polygons_[i].be().size();
+            for (const auto& e : polygons_[i].be())
+                vf << " " << e[0];
+            vf << std::endl;
+        }
+        vf.close();
+    }
+
     void processor::compute_planes(
     ) {
         for (int i = 0; i < np_; ++i) {
             std::vector<Point> v;
-            for (const auto& e : polygons_[i].be()) {
+            for (const auto& e : polygons_[i].be())
                 v.push_back(vertices_[e[0]]);
-            }
                 
-            if (v.size() == 3) {
+            if (v.size() == 3)
                 polygons_[i].plane() = K::Plane_3(v[0], v[1], v[2]);
-            }
-            else {
+            else
                 CGAL::linear_least_squares_fitting_3(v.begin(), v.end(), polygons_[i].plane(), CGAL::Dimension_tag<0>());
-            }
         }
     }
 

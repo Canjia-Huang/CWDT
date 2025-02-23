@@ -116,7 +116,15 @@ struct std::hash<CWDT::triangle> {
 namespace CWDT {
 	class processor {
 	public:
-		processor() {};
+		processor() {
+			env_ = new GRBEnv();
+			gabriel_ = false;
+			minimize_heights_ = true;
+		}
+		const int nv() { return nv_; }
+		const int np() { return np_; }
+		GRBEnv* env() { return env_; }
+		Rt& T() { return T_; }
 
 		int ntri();
 
@@ -124,6 +132,9 @@ namespace CWDT {
 		 * \param[in] in: ifstream of input file
 		 * \return success or not */
 		bool read_OFF(std::ifstream& in);
+		bool read_igl(const std::string& filename);
+		void write_off(std::string filename);
+		void write_woff(std::string filename);
 
 		/** \brief Pre-compute the plane for each polygon. */
 		void compute_planes();
@@ -138,7 +149,7 @@ namespace CWDT {
 		/** \brief Get the adjacency relationship between tets, and store in tetNeighbors. */
 		void buildTetNeighbors();
 
-		int solve(int nr, 
+		int solve(int nr,
 			double mintol, double maxtol,
 			double height_factor, double weight_factor);
 
