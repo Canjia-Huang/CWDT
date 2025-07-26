@@ -1,32 +1,45 @@
-#include "cwdt.h"
-#include "macro.h"
-
+#include "cwdt/cwdt.h"
+#include <fstream>
 #include <string>
-// libigl
-#include <igl/read_triangle_mesh.h>
+#include <CGAL/Constrained_Delaunay_triangulation_2.h>
+#include <CGAL/linear_least_squares_fitting_3.h>
+#include <CGAL/Regular_triangulation_2.h>
+#include <CGAL/Regular_triangulation_face_base_2.h>
+#include <CGAL/Regular_triangulation_vertex_base_2.h>
+#include <CGAL/Triangulation_face_base_with_info_2.h>
+#include <CGAL/Triangulation_vertex_base_with_info_2.h>
 #include <igl/bfs_orient.h>
+#include <igl/read_triangle_mesh.h>
 #include <igl/winding_number.h>
+
+#ifdef CWDT_VERBOSE
+#	define VERBOSE(x) std::cout << "\033[33m" << "[" << __FUNCTION__ << "]" << "\033[0m" << " " << x << std::endl // [yellow] + white cout
+#	define WARNING(x) std::cerr << "\033[33m" << "[" << __FILE__ << " " << __LINE__ << "]" << "\033[0m" << " " << "\033[31m" << x << "\033[0m" << std::endl // [yellow] + red cout
+#else
+#	define VERBOSE(x)
+#	define WARNING(x)
+#endif
+
+#ifdef CWDT_DEBUG
+#endif
+
 // CGAL
 typedef K::Vector_3 Vector;
 typedef K::Weighted_point_3 Weighted_point;
-#include <CGAL/linear_least_squares_fitting_3.h>
 typedef CGAL::Triangulation_vertex_base_with_info_2<int, K> Vb2;
 struct FaceInfo2 {
-    FaceInfo2() {}
+    FaceInfo2(): nesting_level(0) {}
+
     int nesting_level;
-    bool in_domain() {
+    bool in_domain() const {
         return nesting_level % 2 == 1;
     }
 };
 typedef CGAL::Triangulation_face_base_with_info_2<FaceInfo2, K> Fbb;
-#include <CGAL/Constrained_Delaunay_triangulation_2.h>
 typedef CGAL::Constrained_triangulation_face_base_2<K, Fbb> Fb2;
 typedef CGAL::Triangulation_data_structure_2<Vb2, Fb2> Tds2;
 typedef CGAL::No_constraint_intersection_tag Itag;
 typedef CGAL::Constrained_Delaunay_triangulation_2<K, Tds2, Itag> CDT;
-#include <CGAL/Regular_triangulation_2.h>
-#include <CGAL/Regular_triangulation_vertex_base_2.h>
-#include <CGAL/Regular_triangulation_face_base_2.h>
 typedef CGAL::Regular_triangulation_vertex_base_2<K> Vbr0;
 typedef CGAL::Triangulation_vertex_base_with_info_2<int, K, Vbr0> Vb2r;
 typedef CGAL::Regular_triangulation_face_base_2<K> Cbr0;
@@ -36,13 +49,14 @@ typedef CGAL::Triangulation_data_structure_2<Vb2r, Cb2r> Tds2r;
 typedef CGAL::Regular_triangulation_2<K, Tds2r> Rt2;
 
 namespace CWDT {
-    void mark_domains(CDT& ct,
-        CDT::Face_handle start, int index,
+    void mark_domains(
+        const CDT& ct,
+        const CDT::Face_handle start, const int index,
         std::list<CDT::Edge>& border
-    ) {
-        if (start->info().nesting_level != -1) {
+        ) {
+        if (start->info().nesting_level != -1)
             return;
-        }
+
         std::list<CDT::Face_handle> queue;
         queue.push_back(start);
         while (!queue.empty()) {
@@ -52,19 +66,18 @@ namespace CWDT {
                 fh->info().nesting_level = index;
                 for (int i = 0; i < 3; i++) {
                     CDT::Edge e(fh, i);
-                    CDT::Face_handle n = fh->neighbor(i);
-                    if (n->info().nesting_level == -1) {
-                        if (ct.is_constrained(e)) {
+                    if (CDT::Face_handle n = fh->neighbor(i);
+                        n->info().nesting_level == -1) {
+                        if (ct.is_constrained(e))
                             border.push_back(e);
-                        }
-                        else {
+                        else
                             queue.push_back(n);
-                        }
                     }
                 }
             }
         }
     }
+
     void mark_domains(CDT& cdt
     ) {
         for (CDT::All_faces_iterator it = cdt.all_faces_begin(); it != cdt.all_faces_end(); ++it) {
@@ -82,159 +95,13 @@ namespace CWDT {
         }
     }
 
-    int processor::ntri() {
+    int processor::ntri(
+    ) {
         int nt = 0;
         for (auto& p : polygons_) {
             nt += p.tri().size();
         }
         return nt;
-    }
-
-    bool processor::read_OFF(std::ifstream& in
-    ) {
-        if (!in.good()) {
-            WARNING("Input file is not good!");
-            return false;
-        }
-
-        std::string line;
-        std::getline(in, line);
-
-        std::istringstream isf(line);
-
-        /** read the first line **/
-        std::string ft;
-        isf >> ft;
-
-        if (ft.size() < 3 || (ft.substr(ft.size() - 3)) != "OFF") return false;
-        bool woff = (ft == "WOFF"); // with weight?
-
-        /** read the second line **/
-        int ne;
-        std::getline(in, line);
-        std::istringstream iss(line);
-        iss >> nv_ >> np_ >> ne;
-
-        /** read vertices (and weights) **/
-        vertices_.resize(nv_);
-        weights_.resize(nv_);
-
-        for (int i = 0; i < nv_; ++i) {
-            std::getline(in, line);
-            std::istringstream iss(line);
-            double x, y, z, w = 0.0;
-            if (woff) iss >> x >> y >> z >> w;
-            else iss >> x >> y >> z;
-            vertices_[i] = Point(x, y, z);
-            weights_[i] = w;
-        }
-
-        /** read polygons **/
-        polygons_.resize(np_);
-
-        double mina = 180.0;
-        int nf = 0;
-        for (int i = 0; i < np_; i++) {
-            std::getline(in, line);
-            std::istringstream iss(line);
-            int d;
-            iss >> d;
-            if (d < 3) WARNING("Degree < 3");
-
-            int* id = (int*)malloc(sizeof(int) * d);
-
-            for (int v = 0; v < d; ++v) iss >> id[v];
-            int prev_v = d - 1;
-            for (int v = 0; v < d; ++v) {
-                edge e(id[prev_v], id[v]);
-
-                polygons_[i].insert_boundary_edge(e);
-                E2P_[e].push_back(i);
-
-                prev_v = v;
-            }
-            for (int v = 0; v < d; ++v) {
-                double a = CGAL::approximate_angle(vertices_[id[v]], vertices_[id[(v + 1) % d]], vertices_[id[(v + 2) % d]]);
-                if (a < mina) mina = a;
-            }
-
-            free(id);
-        }
-
-        /*std::vector<int> degree(nv_, 0);
-        for (const auto& ep : E2P_) {
-            ++degree[ep.first[0]];
-            ++degree[ep.first[1]];
-        }
-        for (int i = 0; i < nv_; i++) {
-            if (degree[i] < 3) WARNING("Degree of vertex " << i << " is " << degree[i]);
-        }*/
-
-        return true;
-    }
-
-    bool processor::read_igl(const std::string& filename
-    ) {
-        Eigen::MatrixXd EV;
-        Eigen::MatrixXi F;
-        igl::read_triangle_mesh(filename, EV, F);
-        nv_ = EV.rows();
-        vertices_.resize(nv_);
-        weights_.resize(nv_, 0.0);
-        for (int i = 0; i < nv_; i++)
-            vertices_[i] = Point(EV(i, 0), EV(i, 1), EV(i, 2));
-
-        np_ = F.rows();
-        polygons_ = std::vector<poly>(np_);
-        for (int i = 0; i < np_; i++) {
-            int d = 3;
-            for (int v = 0; v < d; v++) {
-                edge e{ F(i, v), F(i, (v + 1) % d) };
-                polygons_[i].be().push_back(e);
-                E2P_[e].push_back(i);
-            }
-        }
-    }
-
-    void processor::write_off(std::string filename)
-    {
-        std::ofstream vf(filename);
-        vf << "OFF" << std::endl;
-        vf << nv_ << " " << ntri() << " 0\n";
-        for (int i = 0; i < nv_; i++)
-        {
-            vf << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
-        }
-        for (int i = 0; i < np_; i++)
-            for (int ii = 0; ii < polygons_[i].tri().size(); ii++)
-            {
-                int v0 = polygons_[i].tri()[ii][0];
-                int v1 = polygons_[i].tri()[ii][1];
-                int v2 = polygons_[i].tri()[ii][2];
-
-                vf << "3 " << v0 << " " << v1 << " " << v2 << "\n";
-            }
-        vf.close();
-    }
-
-    void processor::write_woff(std::string filename)
-    {
-        std::ofstream vf(filename);
-        vf << "WOFF" << std::endl;
-        vf << nv_ << " " << np_ << " 0" << std::endl;
-        vf << std::setprecision(std::numeric_limits<double>::max_digits10);
-        for (int i = 0; i < nv_; i++)
-        {
-            vf << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << " " << weights_[i] << std::endl;
-        }
-        for (int i = 0; i < np_; i++)
-        {
-            vf << polygons_[i].be().size();
-            for (const auto& e : polygons_[i].be())
-                vf << " " << e[0];
-            vf << std::endl;
-        }
-        vf.close();
     }
 
     void processor::compute_planes(
@@ -835,7 +702,7 @@ namespace CWDT {
                             }
                             else {
                                VERBOSE("Should insert on interior edge " << e[0] << " - " << e[1] << " in poly " << i);
-                                auto& ieit = std::find(eis.begin(), eis.end(), e);
+                                const auto& ieit = eis.find(e);
                                 if (ieit == eis.end()) {
                                    VERBOSE("Not found for polygon " << i << "  -> Inserting");
                                     Point em = CGAL::midpoint(vertices_[e[0]], vertices_[e[1]]);
@@ -989,5 +856,186 @@ namespace CWDT {
         VERBOSE("done - " << npt << " tets removed");
 
         return npt;
+    }
+
+    bool processor::read_OFF(const std::string& file_path
+    ) {
+        std::ifstream in(file_path);
+
+        if (!in.good()) {
+            WARNING("Input file is not good!");
+            return false;
+        }
+
+        std::string line;
+        std::getline(in, line);
+
+        std::istringstream isf(line);
+
+        /** read the first line **/
+        std::string ft;
+        isf >> ft;
+
+        if (ft.size() < 3 || (ft.substr(ft.size() - 3)) != "OFF") return false;
+        bool woff = (ft == "WOFF"); // with weight?
+
+        /** read the second line **/
+        int ne;
+        std::getline(in, line);
+        std::istringstream iss(line);
+        iss >> nv_ >> np_ >> ne;
+
+        /** read vertices (and weights) **/
+        vertices_.resize(nv_);
+        weights_.resize(nv_);
+
+        for (int i = 0; i < nv_; ++i) {
+            std::getline(in, line);
+            std::istringstream iss(line);
+            double x, y, z, w = 0.0;
+            if (woff) iss >> x >> y >> z >> w;
+            else iss >> x >> y >> z;
+            vertices_[i] = Point(x, y, z);
+            weights_[i] = w;
+        }
+
+        /** read polygons **/
+        polygons_.resize(np_);
+
+        double mina = 180.0;
+        int nf = 0;
+        for (int i = 0; i < np_; i++) {
+            std::getline(in, line);
+            std::istringstream iss(line);
+            int d;
+            iss >> d;
+            if (d < 3) WARNING("Degree < 3");
+
+            int* id = (int*)malloc(sizeof(int) * d);
+
+            for (int v = 0; v < d; ++v) iss >> id[v];
+            int prev_v = d - 1;
+            for (int v = 0; v < d; ++v) {
+                edge e(id[prev_v], id[v]);
+
+                polygons_[i].insert_boundary_edge(e);
+                E2P_[e].push_back(i);
+
+                prev_v = v;
+            }
+            for (int v = 0; v < d; ++v) {
+                double a = CGAL::approximate_angle(vertices_[id[v]], vertices_[id[(v + 1) % d]], vertices_[id[(v + 2) % d]]);
+                if (a < mina) mina = a;
+            }
+
+            free(id);
+        }
+
+        /*std::vector<int> degree(nv_, 0);
+        for (const auto& ep : E2P_) {
+            ++degree[ep.first[0]];
+            ++degree[ep.first[1]];
+        }
+        for (int i = 0; i < nv_; i++) {
+            if (degree[i] < 3) WARNING("Degree of vertex " << i << " is " << degree[i]);
+        }*/
+
+        return true;
+    }
+
+    bool processor::read_igl(const std::string& file_path
+    ) {
+        Eigen::MatrixXd EV;
+        Eigen::MatrixXi F;
+        igl::read_triangle_mesh(file_path, EV, F);
+        nv_ = EV.rows();
+        vertices_.resize(nv_);
+        weights_.resize(nv_, 0.0);
+        for (int i = 0; i < nv_; i++)
+            vertices_[i] = Point(EV(i, 0), EV(i, 1), EV(i, 2));
+
+        np_ = F.rows();
+        polygons_ = std::vector<poly>(np_);
+        for (int i = 0; i < np_; i++) {
+            int d = 3;
+            for (int v = 0; v < d; v++) {
+                edge e{ F(i, v), F(i, (v + 1) % d) };
+                polygons_[i].be().push_back(e);
+                E2P_[e].push_back(i);
+            }
+        }
+    }
+
+    bool processor::write_off(const std::string& file_path
+    ) {
+        std::ofstream out(file_path);
+
+        if (!out.good()) {
+            WARNING("Output file is not good!");
+            return false;
+        }
+
+        out << "OFF" << std::endl;
+        out << nv_ << " " << ntri() << " 0" << std::endl;
+        for (int i = 0; i < nv_; i++)
+            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
+        for (int i = 0; i < np_; i++)
+            for (int ii = 0; ii < polygons_[i].tri().size(); ii++) {
+                int v0 = polygons_[i].tri()[ii][0];
+                int v1 = polygons_[i].tri()[ii][1];
+                int v2 = polygons_[i].tri()[ii][2];
+
+                out << "3 " << v0 << " " << v1 << " " << v2 << std::endl;
+            }
+        out.close();
+
+        return true;
+    }
+
+    bool processor::write_woff(const std::string& file_path
+    ) {
+        std::ofstream out(file_path);
+
+        if (!out.good()) {
+            WARNING("Output file is not good!");
+            return false;
+        }
+
+        out << "WOFF" << std::endl;
+        out << nv_ << " " << np_ << " 0" << std::endl;
+        out << std::setprecision(std::numeric_limits<double>::max_digits10);
+        for (int i = 0; i < nv_; i++)
+            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << " " << weights_[i] << std::endl;
+
+        for (int i = 0; i < np_; i++) {
+            out << polygons_[i].be().size();
+            for (const auto& e : polygons_[i].be())
+                out << " " << e[0];
+            out << std::endl;
+        }
+        out.close();
+
+        return true;
+    }
+
+    bool processor::write_tet_off(const std::string& file_path,
+        const double& shrink_factor
+    ) {
+        std::ofstream out(file_path);
+
+        if (!out.good()) {
+            WARNING("Output file is not good!");
+            return false;
+        }
+
+        out << "OFF" << std::endl;
+        out << nv_ << " " << ntri() << " 0" << std::endl;
+        for (int i = 0; i < nv_; i++)
+            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
+
+
+        out.close();
+
+        return true;
     }
 }

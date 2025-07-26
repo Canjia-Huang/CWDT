@@ -1,4 +1,4 @@
-#include "cwdt.h"
+#include "cwdt/cwdt.h"
 
 int main(){
 	using namespace CWDT;
@@ -13,7 +13,7 @@ int main(){
     double tolerance = 1e-9;
 
 	processor P;
-	P.read_igl("D://C_Project//CWDT//data//spot_quadrangulated.obj");
+    P.read_igl("../data/spot_quadrangulated.obj");
 	P.compute_planes();
 	P.triangulate();
 	int onv = P.nv();
@@ -50,7 +50,9 @@ int main(){
     std::cout << "Tets: " << P.T().number_of_finite_cells() << " - " << npt << " (peeled) = " << (P.T().number_of_finite_cells() - npt) << std::endl;
 
 
+
     P.write_off("D://C_Project//CWDT//data//result.off");
+    P.write_tet_off("D://C_Project//CWDT//data//result_tets.off");
 
 	return 1;
 }

@@ -1,26 +1,22 @@
-#ifndef CWDT_EDGE_H
-#define CWDT_EDGE_H
+#ifndef CWDT_H
+#define CWDT_H
 
 #include <iostream>
 #include <array>
 #include <vector>
 #include <unordered_map>
-// Gurobi
 #include "gurobi_c++.h"
-// CGAL
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
-typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
-typedef K::FT Weight;
-typedef K::Point_3 Point;
 #include <CGAL/Regular_triangulation_3.h>
 #include <CGAL/Regular_triangulation_vertex_base_3.h>
 #include <CGAL/Regular_triangulation_cell_base_3.h>
+#include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Triangulation_cell_base_with_info_3.h>
+typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
+typedef K::FT Weight;
+typedef K::Point_3 Point;
 typedef CGAL::Regular_triangulation_vertex_base_3<K> Vb0;
 typedef CGAL::Regular_triangulation_cell_base_3<K> Cb0;
-#include <CGAL/Triangulation_vertex_base_with_info_3.h>
-#include <CGAL/Triangulation_vertex_base_with_info_2.h>
-#include <CGAL/Triangulation_face_base_with_info_2.h>
-#include <CGAL/Triangulation_cell_base_with_info_3.h>
 typedef CGAL::Triangulation_vertex_base_with_info_3<int, K, Vb0> Vb;
 typedef CGAL::Triangulation_cell_base_with_info_3<int, K, Cb0> Cb;
 typedef CGAL::Triangulation_data_structure_3<Vb, Cb> Tds;
@@ -121,20 +117,24 @@ namespace CWDT {
 			gabriel_ = false;
 			minimize_heights_ = true;
 		}
-		const int nv() { return nv_; }
-		const int np() { return np_; }
-		GRBEnv* env() { return env_; }
+
+		int nv() const { return nv_; }
+		int np() const { return np_; }
+		GRBEnv* env() const { return env_; }
 		Rt& T() { return T_; }
 
 		int ntri();
 
 		/** \brief Read in constrained mesh information.
+		 * \param[in] file_path
 		 * \param[in] in: ifstream of input file
 		 * \return success or not */
-		bool read_OFF(std::ifstream& in);
-		bool read_igl(const std::string& filename);
-		void write_off(std::string filename);
-		void write_woff(std::string filename);
+		bool read_OFF(const std::string& file_path);
+		bool read_igl(const std::string& file_path);
+		bool write_off(const std::string& file_path);
+		bool write_woff(const std::string& file_path);
+		bool write_tet_off(const std::string& file_path,
+			const double& shrink_factor = 1.);
 
 		/** \brief Pre-compute the plane for each polygon. */
 		void compute_planes();
