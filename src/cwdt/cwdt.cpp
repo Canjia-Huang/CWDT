@@ -1,4 +1,5 @@
 #include "cwdt/cwdt.h"
+
 #include <fstream>
 #include <string>
 #include <CGAL/Constrained_Delaunay_triangulation_2.h>
@@ -78,39 +79,38 @@ namespace CWDT {
         }
     }
 
-    void mark_domains(CDT& cdt
-    ) {
-        for (CDT::All_faces_iterator it = cdt.all_faces_begin(); it != cdt.all_faces_end(); ++it) {
-            it->info().nesting_level = -1;
-        }
-        std::list<CDT::Edge> border;
-        mark_domains(cdt, cdt.infinite_face(), 0, border);
-        while (!border.empty()) {
-            CDT::Edge e = border.front();
-            border.pop_front();
-            CDT::Face_handle n = e.first->neighbor(e.second);
-            if (n->info().nesting_level == -1) {
-                mark_domains(cdt, n, e.first->info().nesting_level + 1, border);
+    void mark_domains(
+        const CDT& cdt
+        ) {
+            for (CDT::All_faces_iterator it = cdt.all_faces_begin(); it != cdt.all_faces_end(); ++it) {
+                it->info().nesting_level = -1;
             }
-        }
+            std::list<CDT::Edge> border;
+            mark_domains(cdt, cdt.infinite_face(), 0, border);
+            while (!border.empty()) {
+                const CDT::Edge e = border.front();
+                border.pop_front();
+                if (const CDT::Face_handle n = e.first->neighbor(e.second);
+                    n->info().nesting_level == -1)
+                    mark_domains(cdt, n, e.first->info().nesting_level + 1, border);
+            }
     }
 
     int processor::ntri(
-    ) {
+        ) {
         int nt = 0;
-        for (auto& p : polygons_) {
+        for (auto& p : polygons_)
             nt += p.tri().size();
-        }
         return nt;
     }
 
     void processor::compute_planes(
-    ) {
+        ) {
         for (int i = 0; i < np_; ++i) {
             std::vector<Point> v;
             for (const auto& e : polygons_[i].be())
                 v.push_back(vertices_[e[0]]);
-                
+
             if (v.size() == 3)
                 polygons_[i].plane() = K::Plane_3(v[0], v[1], v[2]);
             else
@@ -118,47 +118,42 @@ namespace CWDT {
         }
     }
 
-    int processor::triangulate_poly(poly& p
-    ) {
-        int nf = p.be().size() + 2 * p.iv().size() - 2;
+    int processor::triangulate_poly(
+        poly& p
+        ) {
+        const int nf = p.be().size() + 2 * p.iv().size() - 2;
         p.tri().resize(nf);
 
         if (nf == 1) {
             auto eit = p.be().begin();
-            for (int v = 0; v < 3; v++, ++eit) {
+            for (int v = 0; v < 3; v++, ++eit)
                 p.tri()[0][v] = (*eit)[0];
-            }
             return 1;
         }
 
         CDT cdt;
         std::vector<std::pair<CDT::Point, int>> points;
-        for (const auto& e : p.be()) {
+        for (const auto& e : p.be())
             points.push_back(std::make_pair(p.plane().to_2d(vertices_[e[0]]), e[0]));
-        }
         if (!p.iv().empty()) {
-            for (const auto& v : p.iv()) {
+            for (const auto& v : p.iv())
                 points.push_back(std::make_pair(p.plane().to_2d(vertices_[v]), v));
-            }
         }
 
         cdt.insert(points.begin(), points.end());
         std::unordered_map<int, CDT::Vertex_handle> vhm;
         CDT::Finite_vertices_iterator vit = cdt.finite_vertices_begin();
-        for (; vit != cdt.finite_vertices_end(); ++vit) {
+        for (; vit != cdt.finite_vertices_end(); ++vit)
             vhm[vit->info()] = vit;
-        }
-        for (const auto& e : p.be()) {
+        for (const auto& e : p.be())
             cdt.insert_constraint(vhm[e[0]], vhm[e[1]]);
-        }
         mark_domains(cdt);
         CDT::Finite_faces_iterator fit = cdt.finite_faces_begin();
         int fc = 0;
         for (; fit != cdt.finite_faces_end(); ++fit) {
             if (fit->info().in_domain()) {
-                for (int v = 0; v < 3; v++) {
+                for (int v = 0; v < 3; v++)
                     p.tri()[fc][v] = fit->vertex(v)->info();
-                }
                 fc++;
             }
         }
@@ -166,15 +161,15 @@ namespace CWDT {
         return fc;
     }
 
-    int processor::triangulate_cpoly_w(poly& p
-    ) {
-        int nf = p.be().size() + 2 * p.iv().size() - 2;
+    int processor::triangulate_cpoly_w(
+        poly& p
+        ) {
+        const int nf = p.be().size() + 2 * p.iv().size() - 2;
         p.tri().resize(nf);
         if (nf == 1) { // it's a triangle, so just create the single triangle from the edges
             auto eit = p.be().begin();
-            for (int v = 0; v < 3; v++, ++eit) {
+            for (int v = 0; v < 3; v++, ++eit)
                 p.tri()[0][v] = (*eit)[0];
-            }
             return 1;
         }
 
@@ -182,7 +177,7 @@ namespace CWDT {
         std::vector<std::pair<Rt2::Point, int>> points;
         for (const auto& e : p.be()) {
             points.push_back(std::make_pair(
-                Rt2::Point(p.plane().to_2d(vertices_[e[0]]), weights_[e[0]]), 
+                Rt2::Point(p.plane().to_2d(vertices_[e[0]]), weights_[e[0]]),
                 e[0]));
         }
         if (!p.iv().empty()) {
@@ -194,15 +189,13 @@ namespace CWDT {
         rt2.insert(points.begin(), points.end());
         std::unordered_map<int, Rt2::Vertex_handle> vhm;
 
-        for (Rt2::Finite_vertices_iterator vit = rt2.finite_vertices_begin(); vit != rt2.finite_vertices_end(); ++vit) {
+        for (Rt2::Finite_vertices_iterator vit = rt2.finite_vertices_begin(); vit != rt2.finite_vertices_end(); ++vit)
             vhm[vit->info()] = vit;
-        }
 
         int fc = 0;
         for (Rt2::Finite_faces_iterator fit = rt2.finite_faces_begin(); fit != rt2.finite_faces_end(); ++fit) {
-            for (int v = 0; v < 3; ++v) {
+            for (int v = 0; v < 3; ++v)
                 p.tri()[fc][v] = fit->vertex(v)->info();
-            }
             fc++;
         }
         if (fc != nf) {
@@ -215,16 +208,15 @@ namespace CWDT {
     }
 
     int processor::triangulate(
-    ) {
+        ) {
         int nf = 0;
-        for (auto& p : polygons_) {
+        for (auto& p : polygons_)
             nf += triangulate_poly(p);
-        }
         return nf;
     }
 
 	void processor::buildTetNeighbors(
-	) {
+	    ) {
 		VERBOSE("Building tet neighbors");
 
 		const int NT = tets_.size();
@@ -232,9 +224,9 @@ namespace CWDT {
         /** finding vertex-adjacent tets **/
         std::vector<std::vector<int>> vertex_adjacent_tets(nv_); // tet indices adjacent to each vertex
 
-        for (int i = 0; i < NT; ++i) {
-            for (int j = 0; j < 4; ++j) vertex_adjacent_tets[tets_[i][j]].push_back(i);
-        }
+        for (int i = 0; i < NT; ++i)
+            for (int j = 0; j < 4; ++j)
+                vertex_adjacent_tets[tets_[i][j]].push_back(i);
 
         /** finding tet-adjacent tets **/
         tetNeighbors_.resize(NT);
@@ -245,8 +237,7 @@ namespace CWDT {
 
                 triangle cft(tets_[i][j % 4], tets_[i][(j + 1) % 4], tets_[i][(j + 2) % 4]); // a facet of tet[i]
 
-                int bc; // the vertex index with the least number of adjacent tets
-                bc = cft[0];
+                int bc = cft[0]; // the vertex index with the least number of adjacent tets
                 if (vertex_adjacent_tets[cft[1]].size() < vertex_adjacent_tets[bc].size()) {
                     bc = cft[1];
                 }
@@ -258,8 +249,8 @@ namespace CWDT {
                 for (const auto& at : vertex_adjacent_tets[bc]) { // vertex[bc]'s neighboring tet index
                     if (at != i) {
                         for (int k = 0; k < 4; k++) {
-                            triangle aft(tets_[at][k % 4], tets_[at][(k + 1) % 4], tets_[at][(k + 2) % 4]);
-                            if (aft == cft) {
+                            if (triangle aft(tets_[at][k % 4], tets_[at][(k + 1) % 4], tets_[at][(k + 2) % 4]);
+                                aft == cft) {
                                 curr = at;
                                 break;
                             }
@@ -274,10 +265,11 @@ namespace CWDT {
         VERBOSE("Done!");
 	}
 
-    int processor::solve(int nr,
+    int processor::solve(
+        int nr,
         double mintol, double maxtol,
         double height_factor, double weight_factor
-    ) {
+        ) {
         int nic = 0;
 
         std::vector<VH>(nv_).swap(id2vh_);
@@ -612,7 +604,7 @@ namespace CWDT {
     }
 
     int processor::split_missing_edges(
-    ) {
+        ) {
         VERBOSE("Checking edges... ");
         std::vector<std::pair<edge, std::vector<int>>> me;
         for (const auto& it : E2P_) {
@@ -621,9 +613,9 @@ namespace CWDT {
             int c0, c1;
             if (!ve_[e[0]] || !ve_[e[1]] ||
                 !T_.is_edge(id2vh_[e[0]], id2vh_[e[1]], ch, c0, c1))
-                me.push_back(it);
+                me.emplace_back(it);
         }
-        int nme = me.size();
+        const int nme = me.size();
         VERBOSE("Edges missing (encroached): " << nme);
         if (nme == 0)
             return 0;
@@ -640,7 +632,7 @@ namespace CWDT {
                 if (eit == polygons_[pid].be().end())
                     VERBOSE("Edge " << e[0] << ", " << e[1] << " not found in poly " << pid);
 
-                int v = (*eit)[0];
+                const int v = (*eit)[0];
                 (*eit)[0] = nv_;
                 polygons_[pid].be().insert(eit, edge{v, nv_});
 
@@ -663,7 +655,7 @@ namespace CWDT {
     }
 
     int processor::split_missing_faces(
-    ) {
+        ) {
         std::unordered_set<int> mp;
         std::unordered_set<edge> ebs;
         std::vector<std::pair<Point, int>> ccp;
@@ -731,7 +723,7 @@ namespace CWDT {
 
                     if (icc) {
                        VERBOSE("Potentially inserting cc");
-                       ccp.push_back(std::make_pair(cc, i));
+                       ccp.emplace_back(cc, i);
                     }
                 }
             }
@@ -783,8 +775,9 @@ namespace CWDT {
        return ni + ebs.size() + ccp.size();
     }
 
-    void processor::missing_faces(std::vector<int>& cmt
-    ) {
+    void processor::missing_faces(
+        std::vector<int>& cmt
+        ) {
         std::vector<int>().swap(cmt);
         for (int i = 0; i < np_; ++i) {
             for (int ii = 0; ii < polygons_[i].tri().size(); ++ii) {
@@ -804,8 +797,9 @@ namespace CWDT {
         }
     }
 
-    int processor::peel_by_winding_number(double thr
-    ) {
+    int processor::peel_by_winding_number(
+        double thr
+        ) {
         VERBOSE("Peeling... ");
         Eigen::MatrixXd BC(T_.number_of_finite_cells(), 3);
 
@@ -829,26 +823,23 @@ namespace CWDT {
         Eigen::MatrixXi F(nf, 3);
         nf = 0;
         for (int i = 0; i < np_; ++i) {
-            for (int j = 0; j < polygons_[i].tri().size(); j++) {
+            for (int j = 0; j < polygons_[i].tri().size(); j++)
                 F.row(nf++) << polygons_[i].tri()[j][0], polygons_[i].tri()[j][1], polygons_[i].tri()[j][2];
-            }
         }
 
         igl::bfs_orient(F, F, CO);
         Eigen::MatrixXd EV(nv_, 3);
         for (int i = 0; i < nv_; ++i) {
-            for (int j = 0; j < 3; ++j) {
+            for (int j = 0; j < 3; ++j)
                 EV(i, j) = vertices_[i][j];
-            }
         }
         igl::winding_number(EV, F, BC, WN);
 
         int npt = 0;
         cit = T_.finite_cells_begin();
         for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti)
-            if (fabs(WN(ti)) > thr) {
+            if (fabs(WN(ti)) > thr)
                 cit->info() = 0;
-            }
             else {
                 cit->info() = -1;
                 npt++;
@@ -858,8 +849,9 @@ namespace CWDT {
         return npt;
     }
 
-    bool processor::read_OFF(const std::string& file_path
-    ) {
+    bool processor::read_off(
+        const std::string& file_path
+        ) {
         std::ifstream in(file_path);
 
         if (!in.good()) {
@@ -891,10 +883,10 @@ namespace CWDT {
 
         for (int i = 0; i < nv_; ++i) {
             std::getline(in, line);
-            std::istringstream iss(line);
+            std::istringstream iss1(line);
             double x, y, z, w = 0.0;
-            if (woff) iss >> x >> y >> z >> w;
-            else iss >> x >> y >> z;
+            if (woff) iss1 >> x >> y >> z >> w;
+            else iss1 >> x >> y >> z;
             vertices_[i] = Point(x, y, z);
             weights_[i] = w;
         }
@@ -903,17 +895,16 @@ namespace CWDT {
         polygons_.resize(np_);
 
         double mina = 180.0;
-        int nf = 0;
         for (int i = 0; i < np_; i++) {
             std::getline(in, line);
-            std::istringstream iss(line);
+            std::istringstream iss2(line);
             int d;
-            iss >> d;
+            iss2 >> d;
             if (d < 3) WARNING("Degree < 3");
 
-            int* id = (int*)malloc(sizeof(int) * d);
+            auto id = static_cast<int*>(malloc(sizeof(int) * d));
 
-            for (int v = 0; v < d; ++v) iss >> id[v];
+            for (int v = 0; v < d; ++v) iss2 >> id[v];
             int prev_v = d - 1;
             for (int v = 0; v < d; ++v) {
                 edge e(id[prev_v], id[v]);
@@ -924,27 +915,23 @@ namespace CWDT {
                 prev_v = v;
             }
             for (int v = 0; v < d; ++v) {
-                double a = CGAL::approximate_angle(vertices_[id[v]], vertices_[id[(v + 1) % d]], vertices_[id[(v + 2) % d]]);
-                if (a < mina) mina = a;
+                if (double a = CGAL::approximate_angle(
+                    vertices_[id[v]],
+                    vertices_[id[(v + 1) % d]],
+                    vertices_[id[(v + 2) % d]]);
+                    a < mina
+                    ) mina = a;
             }
 
             free(id);
         }
 
-        /*std::vector<int> degree(nv_, 0);
-        for (const auto& ep : E2P_) {
-            ++degree[ep.first[0]];
-            ++degree[ep.first[1]];
-        }
-        for (int i = 0; i < nv_; i++) {
-            if (degree[i] < 3) WARNING("Degree of vertex " << i << " is " << degree[i]);
-        }*/
-
         return true;
     }
 
-    bool processor::read_igl(const std::string& file_path
-    ) {
+    bool processor::read_igl(
+        const std::string& file_path
+        ) {
         Eigen::MatrixXd EV;
         Eigen::MatrixXi F;
         igl::read_triangle_mesh(file_path, EV, F);
@@ -957,17 +944,20 @@ namespace CWDT {
         np_ = F.rows();
         polygons_ = std::vector<poly>(np_);
         for (int i = 0; i < np_; i++) {
-            int d = 3;
+            constexpr int d = 3;
             for (int v = 0; v < d; v++) {
                 edge e{ F(i, v), F(i, (v + 1) % d) };
                 polygons_[i].be().push_back(e);
                 E2P_[e].push_back(i);
             }
         }
+
+        return true;
     }
 
-    bool processor::write_off(const std::string& file_path
-    ) {
+    bool processor::write_off(
+        const std::string& file_path
+        ) {
         std::ofstream out(file_path);
 
         if (!out.good()) {
@@ -978,22 +968,24 @@ namespace CWDT {
         out << "OFF" << std::endl;
         out << nv_ << " " << ntri() << " 0" << std::endl;
         for (int i = 0; i < nv_; i++)
-            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
-        for (int i = 0; i < np_; i++)
+            out << vertices_[i].x() << " " << vertices_[i].y() << " " << vertices_[i].z() << std::endl;
+        for (int i = 0; i < np_; i++) {
             for (int ii = 0; ii < polygons_[i].tri().size(); ii++) {
-                int v0 = polygons_[i].tri()[ii][0];
-                int v1 = polygons_[i].tri()[ii][1];
-                int v2 = polygons_[i].tri()[ii][2];
+                const int v0 = polygons_[i].tri()[ii][0];
+                const int v1 = polygons_[i].tri()[ii][1];
+                const int v2 = polygons_[i].tri()[ii][2];
 
                 out << "3 " << v0 << " " << v1 << " " << v2 << std::endl;
             }
+        }
         out.close();
 
         return true;
     }
 
-    bool processor::write_woff(const std::string& file_path
-    ) {
+    bool processor::write_woff(
+        const std::string& file_path
+        ) {
         std::ofstream out(file_path);
 
         if (!out.good()) {
@@ -1005,7 +997,7 @@ namespace CWDT {
         out << nv_ << " " << np_ << " 0" << std::endl;
         out << std::setprecision(std::numeric_limits<double>::max_digits10);
         for (int i = 0; i < nv_; i++)
-            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << " " << weights_[i] << std::endl;
+            out << vertices_[i].x() << " " << vertices_[i].y() << " " << vertices_[i].z() << " " << weights_[i] << std::endl;
 
         for (int i = 0; i < np_; i++) {
             out << polygons_[i].be().size();
@@ -1018,9 +1010,10 @@ namespace CWDT {
         return true;
     }
 
-    bool processor::write_tet_off(const std::string& file_path,
+    bool processor::write_tet_off(
+        const std::string& file_path,
         const double& shrink_factor
-    ) {
+        ) {
         std::ofstream out(file_path);
 
         if (!out.good()) {
@@ -1031,8 +1024,7 @@ namespace CWDT {
         out << "OFF" << std::endl;
         out << nv_ << " " << ntri() << " 0" << std::endl;
         for (int i = 0; i < nv_; i++)
-            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << "\n";
-
+            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << std::endl;
 
         out.close();
 

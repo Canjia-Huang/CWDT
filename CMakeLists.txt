@@ -3,6 +3,7 @@ cmake_minimum_required (VERSION 3.10)
 project(CWDT)
 
 set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_BUILD_TYPE "Release")
 add_compile_definitions(CWDT_VERBOSE) # for test verbose
@@ -18,7 +19,8 @@ list(PREPEND CMAKE_MODULE_PATH
 find_package(Eigen3 REQUIRED)
 IF(Eigen3_FOUND)
     message(STATUS "Eigen3 FOUNDED ${EIGEN3_VERSION_STRING} IN ${EIGEN3_INCLUDE_DIR}")
-    include_directories(${EIGEN3_INCLUDE_DIR})
+#    include_directories(${EIGEN3_INCLUDE_DIR})
+    include_directories("/home/huangcanjia/eigen")
 ELSE()
     message(FATAL_ERROR "Eigen3 NOT FOUNDED")
 ENDIF()
@@ -41,6 +43,8 @@ ELSE()
     message(FATAL_ERROR "CGAL NOT FOUNDED")
 ENDIF()
 
+find_package(GMP REQUIRED)
+
 # Gurobi
 find_package(Gurobi REQUIRED)
 IF(GUROBI_FOUND)
@@ -62,8 +66,13 @@ ENDIF()
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
 
-add_executable(CWDT
+add_executable(${PROJECT_NAME}
         "${CMAKE_SOURCE_DIR}/src/cwdt/cwdt.cpp"
         "${CMAKE_SOURCE_DIR}/src/main.cpp")
-target_link_libraries(CWDT ${GUROBI_LIBRARY})
-target_link_libraries(CWDT ${GUROBI_CPP_LIBRARY})
+target_link_libraries(${PROJECT_NAME}
+        PRIVATE
+        CGAL::CGAL
+        ${GMP_LIBRARIES}
+        ${GUROBI_CPP_LIBRARY}
+        ${GUROBI_LIBRARY}
+)

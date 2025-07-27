@@ -1,17 +1,17 @@
 #ifndef CWDT_H
 #define CWDT_H
 
-#include <iostream>
-#include <array>
-#include <vector>
-#include <unordered_map>
-#include "gurobi_c++.h"
 #include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
+#include <array>
+#include <iostream>
+#include <unordered_map>
+#include <vector>
 #include <CGAL/Regular_triangulation_3.h>
-#include <CGAL/Regular_triangulation_vertex_base_3.h>
 #include <CGAL/Regular_triangulation_cell_base_3.h>
-#include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include <CGAL/Regular_triangulation_vertex_base_3.h>
 #include <CGAL/Triangulation_cell_base_with_info_3.h>
+#include <CGAL/Triangulation_vertex_base_with_info_3.h>
+#include "gurobi_c++.h"
 typedef CGAL::Exact_predicates_inexact_constructions_kernel K;
 typedef K::FT Weight;
 typedef K::Point_3 Point;
@@ -30,7 +30,7 @@ typedef Rt::Cell_handle CH;
 namespace CWDT {
 	class edge {
 	public:
-		edge(int v1, int v2) {
+		edge(const int v1, const int v2) {
 			ev_ = { v1, v2 };
 		}
 
@@ -39,11 +39,11 @@ namespace CWDT {
 				&& (ev_[1] == e.ev_[0] && ev_[1] == e.ev_[1]);
 		}
 
-		int& operator[](int i) {
+		int& operator[](const int i) {
 			return ev_[i];
 		}
 
-		const int& operator[](int i) const {
+		const int& operator[](const int i) const {
 			return ev_[i];
 		}
 
@@ -54,7 +54,7 @@ namespace CWDT {
 	class triangle {
 	public:
 		triangle() {};
-		triangle(int v1, int v2, int v3) {
+		triangle(const int v1, const int v2, const int v3) {
 			tv_ = { v1, v2, v3 };
 		}
 
@@ -79,7 +79,9 @@ namespace CWDT {
 	public:
 		poly() {};
 
-		void insert_boundary_edge(const edge& e) { 
+		void insert_boundary_edge(
+			const edge& e
+			) {
 			be_.push_back(e);
 		}
 
@@ -98,14 +100,14 @@ namespace CWDT {
 template<>
 struct std::hash<CWDT::edge> {
 	size_t operator()(CWDT::edge const& key) const {
-		return (size_t)key[0] * (size_t)key[1];
+		return static_cast<size_t>(key[0]) * static_cast<size_t>(key[1]);
 	}
 };
 
 template<>
 struct std::hash<CWDT::triangle> {
 	size_t operator()(CWDT::triangle const& key) const {
-		return (size_t)key[0] * (size_t)key[1] * (size_t)key[2];
+		return static_cast<size_t>(key[0]) * static_cast<size_t>(key[1]) * static_cast<size_t>(key[2]);
 	}
 };
 
@@ -129,7 +131,7 @@ namespace CWDT {
 		 * \param[in] file_path
 		 * \param[in] in: ifstream of input file
 		 * \return success or not */
-		bool read_OFF(const std::string& file_path);
+		bool read_off(const std::string& file_path);
 		bool read_igl(const std::string& file_path);
 		bool write_off(const std::string& file_path);
 		bool write_woff(const std::string& file_path);
@@ -159,6 +161,7 @@ namespace CWDT {
 		void missing_faces(std::vector<int>& cmt);
 
 		int peel_by_winding_number(double thr);
+
 	private:
 		int nv_; // vertex nb
 		int np_; // polygon nb
@@ -171,7 +174,7 @@ namespace CWDT {
 
 		std::vector<std::array<int, 4>> tets_;
 		std::vector<std::array<int, 4>> tetNeighbors_; /* the index of the adjacent tet corresponding to each vertex in tet,
-														-1 means there is no adjacent tet */ 
+														-1 means there is no adjacent tet */
 
 		std::vector<VH> id2vh_;
 		std::vector<bool> ve_;
@@ -183,7 +186,6 @@ namespace CWDT {
 		bool minimize_heights_, write_missing_, write_max_constraints_, write_witness_;
 
 		Rt T_;
-
 	};
 }
 #endif

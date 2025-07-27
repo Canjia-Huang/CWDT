@@ -30,5 +30,8 @@ If you use this code, you need to cite:
 }
 ```
 
+# deps
+
+- Eigen (3.4)
 
 

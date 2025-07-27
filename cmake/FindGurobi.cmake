@@ -14,6 +14,10 @@ file(GLOB
         "/opt/gurobi/gurobi*/linux64"
         "/opt/gurobi*/linux64"
         "/Library/gurobi*/mac64"
+        "../../gurobi*/linux64"
+        "../../gurobi*/mac64"
+        "../gurobi*/linux64"
+        "../gurobi*/mac64"
         "C:\\gurobi*\\win64")
 find_path(GUROBI_INSTALL_DIR
         NAMES "include/gurobi_c++.h"

@@ -51,8 +51,8 @@ int main(){
 
 
 
-    P.write_off("D://C_Project//CWDT//data//result.off");
-    P.write_tet_off("D://C_Project//CWDT//data//result_tets.off");
+    P.write_off("../data/result.off");
+    P.write_tet_off("../data/result_tets.off");
 
 	return 1;
 }
