@@ -6,10 +6,9 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_BUILD_TYPE "Release")
+
 add_compile_definitions(CWDT_VERBOSE) # for test verbose
-add_compile_definitions(CWDT_DEBUG) # for test output
 add_compile_definitions(OUTPUT_PATH="${PROJECT_SOURCE_DIR}/data/") # set output file path
-# add_compile_options(/openmp:llvm)
 
 # CMake module path
 list(PREPEND CMAKE_MODULE_PATH
@@ -19,8 +18,7 @@ list(PREPEND CMAKE_MODULE_PATH
 find_package(Eigen3 REQUIRED)
 IF(Eigen3_FOUND)
     message(STATUS "Eigen3 FOUNDED ${EIGEN3_VERSION_STRING} IN ${EIGEN3_INCLUDE_DIR}")
-#    include_directories(${EIGEN3_INCLUDE_DIR})
-    include_directories("/home/huangcanjia/eigen")
+    include_directories(${EIGEN3_INCLUDE_DIR})
 ELSE()
     message(FATAL_ERROR "Eigen3 NOT FOUNDED")
 ENDIF()
@@ -65,6 +63,7 @@ ENDIF()
 
 
 include_directories(${PROJECT_SOURCE_DIR}/src)
+include_directories(${PROJECT_SOURCE_DIR}/deps)
 
 add_executable(${PROJECT_NAME}
         "${CMAKE_SOURCE_DIR}/src/cwdt/cwdt.cpp"

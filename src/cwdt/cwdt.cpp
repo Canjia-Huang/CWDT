@@ -14,14 +14,11 @@
 #include <igl/winding_number.h>
 
 #ifdef CWDT_VERBOSE
-#	define VERBOSE(x) std::cout << "\033[33m" << "[" << __FUNCTION__ << "]" << "\033[0m" << " " << x << std::endl // [yellow] + white cout
-#	define WARNING(x) std::cerr << "\033[33m" << "[" << __FILE__ << " " << __LINE__ << "]" << "\033[0m" << " " << "\033[31m" << x << "\033[0m" << std::endl // [yellow] + red cout
+#	define CWDT_VERBOSE(x) std::cout << "\033[33m" << "[" << __FUNCTION__ << "]" << "\033[0m" << " " << x << std::endl // [yellow] + white cout
+#	define CWDT_WARNING(x) std::cerr << "\033[33m" << "[" << __FILE__ << " " << __LINE__ << "]" << "\033[0m" << " " << "\033[31m" << x << "\033[0m" << std::endl // [yellow] + red cout
 #else
-#	define VERBOSE(x)
-#	define WARNING(x)
-#endif
-
-#ifdef CWDT_DEBUG
+#	define CWDT_VERBOSE(x)
+#	define CWDT_WARNING(x)
 #endif
 
 // CGAL
@@ -120,7 +117,7 @@ namespace CWDT {
 
     int processor::triangulate_poly(
         poly& p
-        ) {
+        ) const {
         const int nf = p.be().size() + 2 * p.iv().size() - 2;
         p.tri().resize(nf);
 
@@ -134,10 +131,10 @@ namespace CWDT {
         CDT cdt;
         std::vector<std::pair<CDT::Point, int>> points;
         for (const auto& e : p.be())
-            points.push_back(std::make_pair(p.plane().to_2d(vertices_[e[0]]), e[0]));
+            points.emplace_back(p.plane().to_2d(vertices_[e[0]]), e[0]);
         if (!p.iv().empty()) {
             for (const auto& v : p.iv())
-                points.push_back(std::make_pair(p.plane().to_2d(vertices_[v]), v));
+                points.emplace_back(p.plane().to_2d(vertices_[v]), v);
         }
 
         cdt.insert(points.begin(), points.end());
@@ -163,7 +160,7 @@ namespace CWDT {
 
     int processor::triangulate_cpoly_w(
         poly& p
-        ) {
+        ) const {
         const int nf = p.be().size() + 2 * p.iv().size() - 2;
         p.tri().resize(nf);
         if (nf == 1) { // it's a triangle, so just create the single triangle from the edges
@@ -176,15 +173,15 @@ namespace CWDT {
         Rt2 rt2;
         std::vector<std::pair<Rt2::Point, int>> points;
         for (const auto& e : p.be()) {
-            points.push_back(std::make_pair(
+            points.emplace_back(
                 Rt2::Point(p.plane().to_2d(vertices_[e[0]]), weights_[e[0]]),
-                e[0]));
+                e[0]);
         }
         if (!p.iv().empty()) {
             for (const auto& v : p.iv())
-                points.push_back(std::make_pair(
+                points.emplace_back(
                     Rt2::Point(p.plane().to_2d(vertices_[v]), weights_[v]),
-                    v));
+                    v);
         }
         rt2.insert(points.begin(), points.end());
         std::unordered_map<int, Rt2::Vertex_handle> vhm;
@@ -199,7 +196,7 @@ namespace CWDT {
             fc++;
         }
         if (fc != nf) {
-            WARNING("Something very wrong?" << fc << " = " << nf);
+            CWDT_WARNING("Something very wrong?" << fc << " = " << nf);
 
             exit(1);
         }
@@ -217,7 +214,7 @@ namespace CWDT {
 
 	void processor::buildTetNeighbors(
 	    ) {
-		VERBOSE("Building tet neighbors");
+		CWDT_VERBOSE("Building tet neighbors");
 
 		const int NT = tets_.size();
 
@@ -238,12 +235,10 @@ namespace CWDT {
                 triangle cft(tets_[i][j % 4], tets_[i][(j + 1) % 4], tets_[i][(j + 2) % 4]); // a facet of tet[i]
 
                 int bc = cft[0]; // the vertex index with the least number of adjacent tets
-                if (vertex_adjacent_tets[cft[1]].size() < vertex_adjacent_tets[bc].size()) {
+                if (vertex_adjacent_tets[cft[1]].size() < vertex_adjacent_tets[bc].size())
                     bc = cft[1];
-                }
-                if (vertex_adjacent_tets[cft[2]].size() < vertex_adjacent_tets[bc].size()) {
+                if (vertex_adjacent_tets[cft[2]].size() < vertex_adjacent_tets[bc].size())
                     bc = cft[2];
-                }
 
                 int curr = -1;
                 for (const auto& at : vertex_adjacent_tets[bc]) { // vertex[bc]'s neighboring tet index
@@ -262,7 +257,7 @@ namespace CWDT {
             }
         }
 
-        VERBOSE("Done!");
+        CWDT_VERBOSE("Done!");
 	}
 
     int processor::solve(
@@ -277,7 +272,7 @@ namespace CWDT {
         std::vector<std::pair<Weighted_point, int>> Pi(nv_);
 
         int nf = ntri();
-        VERBOSE("Number of constrained triangles: " << nf);
+        CWDT_VERBOSE("Number of constrained triangles: " << nf);
 
         std::vector<bool> dve(nf, false), ignore(nf, false);
         std::vector<std::unordered_map<int, double>> constr_tol(nf);
@@ -291,7 +286,7 @@ namespace CWDT {
         }
 
         try {
-            GRBModel model = GRBModel(*env_);
+            auto model = GRBModel(*env_);
             model.set(GRB_IntParam_OutputFlag, 0);
 
             /** Create variables **/
@@ -306,15 +301,15 @@ namespace CWDT {
             if (!gabriel_) {
                 std::vector<double> lbf(nf, -GRB_INFINITY);
                 std::vector<double> lbv(3 * nv_, -GRB_INFINITY);
-                h = model.addVars(&lbf[0], NULL, NULL, NULL, NULL, nf);
-                g = model.addVars(&lbv[0], NULL, NULL, NULL, NULL, 3 * nv_);
+                h = model.addVars(&lbf[0], nullptr, nullptr, nullptr, nullptr, nf);
+                g = model.addVars(&lbv[0], nullptr, nullptr, nullptr, nullptr, 3 * nv_);
             }
 
             /** Set objective **/
             GRBQuadExpr qe;
             GRBLinExpr le;
-            std::vector<double> onev(nv_, weight_factor); //,b(nv);
-            std::vector<double> onep(nf, height_factor); //,b(nv);
+            std::vector onev(nv_, weight_factor); //,b(nv);
+            std::vector onep(nf, height_factor); //,b(nv);
             // squared norm of height vector
             if (!gabriel_)
                 qe.addTerms(&onep[0], h, h, nf);
@@ -327,11 +322,10 @@ namespace CWDT {
             else
                 model.setObjective(le, GRB_MINIMIZE);
             int ntc = 0;
-            int nutc = 0;
 
             Eigen::MatrixXd Z(nf, 3);
             for (int r = 0; r < nr; ++r) {
-                VERBOSE("Round " << r);
+                CWDT_VERBOSE("Round " << r);
 
                 for (int i = 0; i < nv_; i++)
                     Pi[i] = std::make_pair(Weighted_point(vertices_[i], weights_[i]), i);
@@ -346,15 +340,14 @@ namespace CWDT {
                     ve_[vit->info()] = true;
                 }
 
-                int nacv = 0;
                 int nmv = 0;
                 int nmt = 0;
                 int ti = 0;
 
                 nmv = nv_ - T_.number_of_vertices();
-                VERBOSE("Number of missing vertices: " << nmv << " / " << nv_);
+                CWDT_VERBOSE("Number of missing vertices: " << nmv << " / " << nv_);
                 if (nmv < 0) {
-                    for (int i = 0; i < nv_; ++i)
+                    for (int i = 0; i < nv_; ++i) {
                         if (!ve_[i]) {
                             Eigen::RowVector3d p(
                                 vertices_[i][0],
@@ -365,8 +358,8 @@ namespace CWDT {
                             VH vh = T_.nearest_power_vertex(z);
                             int vi = vh->info();
                             if (vi == i)
-                                VERBOSE("Weird!");
-                            VERBOSE("Adding " << i << " - " << vi);
+                                CWDT_VERBOSE("Weird!");
+                            CWDT_VERBOSE("Adding " << i << " - " << vi);
 
                             Eigen::RowVector3d pi(
                                 vertices_[vi][0],
@@ -387,6 +380,7 @@ namespace CWDT {
                             model.addConstr(l, GRB_LESS_EQUAL, rhs, std::to_string(-i));
                             ntc++;
                         }
+                    }
                 }
 
                 std::vector<int> ac(np_, 0);
@@ -465,14 +459,15 @@ namespace CWDT {
 
                                 vi = T_.nearest_power_vertex(p)->info();
 
-                                auto vit = constr_tol[ti].find(vi);
-                                if (vit != constr_tol[ti].end()) {
+                                if (auto vit = constr_tol[ti].find(vi);
+                                    vit != constr_tol[ti].end()
+                                    ) {
                                     tol = vit->second;
                                     tol *= 2.0;
                                     if (tol > maxtol) {
                                         ignore[ti] = true;
                                         nic++;
-                                        VERBOSE("Ignoring " << ti << " because it has reach max tolerance");
+                                        CWDT_VERBOSE("Ignoring " << ti << " because it has reach max tolerance");
                                         GRBConstr* c = model.getConstrs();
                                         for (int ci = 0; ci < model.get(GRB_IntAttr_NumConstrs); ++ci) {
                                             int ctid = atoi(c[ci].get(GRB_StringAttr_ConstrName).c_str());
@@ -526,7 +521,7 @@ namespace CWDT {
                 }
 
                 if (nmt == 0) {
-                    VERBOSE("No constraint violations anymore, breaking in round: " << r);
+                    CWDT_VERBOSE("No constraint violations anymore, breaking in round: " << r);
                     int mnc = 0, mnci = -1, tncv = 0;
                     std::unordered_map<int, int> chist;
                     for (int csi = 0; csi < ti; csi++) {
@@ -538,25 +533,25 @@ namespace CWDT {
                         tncv += cts;
                         chist[cts]++;
                     }
-                    VERBOSE( "Constraint triangle " << mnci << " has max # of constraints: " << mnc);
-                    VERBOSE("Total constraints: " << tncv << ", per constrained triangle: " << ((double)tncv / (double)ntri()));
-                    VERBOSE("Histogram");
+                    CWDT_VERBOSE( "Constraint triangle " << mnci << " has max # of constraints: " << mnc);
+                    CWDT_VERBOSE("Total constraints: " << tncv << ", per constrained triangle: " <<
+                        (static_cast<double>(tncv) / static_cast<double>(ntri())));
+                    CWDT_VERBOSE("Histogram");
                     for (int csi = 0; csi <= mnc; csi++)
-                        VERBOSE(csi << ": " << chist[csi]);
+                        CWDT_VERBOSE(csi << ": " << chist[csi]);
                     return nic;
                 }
-                else
-                    VERBOSE("Number of missing triangles: " << nmt << " / " << ti << std::endl
-                            << "Total number of constraints added: " << ntc);
+                CWDT_VERBOSE("Number of missing triangles: " << nmt << " / " << ti << std::endl
+                    << "Total number of constraints added: " << ntc);
 
                 model.optimize();
 
                 int status = model.get(GRB_IntAttr_Status);
-                VERBOSE("Status: ");
+                CWDT_VERBOSE("Status: ");
 
                 if (status == GRB_INFEASIBLE || status == GRB_INF_OR_UNBD) {
                     model.computeIIS();
-                    VERBOSE("\nThe following constraint cannot be satisfied: ");
+                    CWDT_VERBOSE("\nThe following constraint cannot be satisfied: ");
                     GRBConstr* c = model.getConstrs();
                     int tid = -1;
                     for (int i = 0; i < model.get(GRB_IntAttr_NumConstrs); ++i) {
@@ -593,9 +588,9 @@ namespace CWDT {
                 }
             }
         }
-        catch (GRBException e) {
-            WARNING("Error code = " << e.getErrorCode());
-            WARNING(e.getMessage());
+        catch (GRBException& e) {
+            CWDT_WARNING("Error code = " << e.getErrorCode());
+            CWDT_WARNING(e.getMessage());
         }
 
         std::vector<double>(nv_, 0.).swap(weights_);
@@ -605,7 +600,7 @@ namespace CWDT {
 
     int processor::split_missing_edges(
         ) {
-        VERBOSE("Checking edges... ");
+        CWDT_VERBOSE("Checking edges... ");
         std::vector<std::pair<edge, std::vector<int>>> me;
         for (const auto& it : E2P_) {
             edge e = it.first;
@@ -616,7 +611,7 @@ namespace CWDT {
                 me.emplace_back(it);
         }
         const int nme = me.size();
-        VERBOSE("Edges missing (encroached): " << nme);
+        CWDT_VERBOSE("Edges missing (encroached): " << nme);
         if (nme == 0)
             return 0;
 
@@ -630,7 +625,7 @@ namespace CWDT {
             for (const auto& pid : me[i].second) {
                 auto eit = std::find(polygons_[pid].be().begin(), polygons_[pid].be().end(), e);
                 if (eit == polygons_[pid].be().end())
-                    VERBOSE("Edge " << e[0] << ", " << e[1] << " not found in poly " << pid);
+                    CWDT_VERBOSE("Edge " << e[0] << ", " << e[1] << " not found in poly " << pid);
 
                 const int v = (*eit)[0];
                 (*eit)[0] = nv_;
@@ -643,7 +638,7 @@ namespace CWDT {
             E2P_.erase(e);
             ++nv_;
         }
-        VERBOSE("Modified " << mp.size());
+        CWDT_VERBOSE("Modified " << mp.size());
         std::vector<bool> af(np_, true);
 
         for (const auto& i : mp) {
@@ -666,7 +661,7 @@ namespace CWDT {
 
             for (int ii = 0; ii < polygons_[i].tri().size(); ++ii) {
                 triangle t = polygons_[i].tri()[ii];
-                VERBOSE("Checking triangle " << t[0] << ", " << t[1] << ", " << t[2]);
+                CWDT_VERBOSE("Checking triangle " << t[0] << ", " << t[1] << ", " << t[2]);
                 // we can assume all vertices are there, because all edges are there
                 CH ch;
                 int c0, c1, c2;
@@ -676,27 +671,26 @@ namespace CWDT {
                     ch, c0, c1, c2)) {
                     bool icc = true;
                     Point cc = CGAL::circumcenter(vertices_[t[0]], vertices_[t[1]], vertices_[t[2]]);
-                    VERBOSE("cc: " << cc);
+                    CWDT_VERBOSE("cc: " << cc);
 
                     for (int j = 0; j < 3; ++j) {
                         // consider edge j, j+2
                         edge e = edge{ t[j], t[(j + 2) % 3] };
                         // is it part of the boundary of P[i]?
                         auto eit = std::find(polygons_[i].be().begin(), polygons_[i].be().end(), e);
-                        bool ob = (eit != polygons_[i].be().end());
+                        const bool ob = (eit != polygons_[i].be().end());
                         // is the angle opposite e obtuse?
-                        bool wa = (CGAL::angle(vertices_[t[j]], vertices_[t[(j + 1) % 3]], vertices_[t[(j + 2) % 3]]) != CGAL::ACUTE);
+                        const bool wa = (CGAL::angle(vertices_[t[j]], vertices_[t[(j + 1) % 3]], vertices_[t[(j + 2) % 3]]) != CGAL::ACUTE);
                         // if angle is obtuse split edge in any case
                         // if edge is on boundary and encroached by cc also split
                         if (wa) {
-                            if (ob) {
+                            if (ob)
                                 ebs.insert(e);
-                            }
                             else {
-                               VERBOSE("Should insert on interior edge " << e[0] << " - " << e[1] << " in poly " << i);
+                               CWDT_VERBOSE("Should insert on interior edge " << e[0] << " - " << e[1] << " in poly " << i);
                                 const auto& ieit = eis.find(e);
                                 if (ieit == eis.end()) {
-                                   VERBOSE("Not found for polygon " << i << "  -> Inserting");
+                                   CWDT_VERBOSE("Not found for polygon " << i << "  -> Inserting");
                                     Point em = CGAL::midpoint(vertices_[e[0]], vertices_[e[1]]);
                                     vertices_.push_back(em);
                                     weights_.push_back(0.0);
@@ -722,17 +716,17 @@ namespace CWDT {
                     }
 
                     if (icc) {
-                       VERBOSE("Potentially inserting cc");
+                       CWDT_VERBOSE("Potentially inserting cc");
                        ccp.emplace_back(cc, i);
                     }
                 }
             }
         }
 
-       VERBOSE("Interior insertions: " << ni);
-       VERBOSE("Encroached edges by ccs: " << (int)ebs.size());
+        CWDT_VERBOSE("Interior insertions: " << ni);
+        CWDT_VERBOSE("Encroached edges by ccs: " << static_cast<int>(ebs.size()));
 
-       for (const auto& e : ebs) {
+        for (const auto& e : ebs) {
            Point em = CGAL::midpoint(vertices_[e[0]], vertices_[e[1]]);
            vertices_.push_back(em);
            weights_.push_back(0.0);
@@ -740,9 +734,9 @@ namespace CWDT {
            for (auto pid : E2P_[e])  {
                auto eit = std::find(polygons_[pid].be().begin(), polygons_[pid].be().end(), e);
                if (eit == polygons_[pid].be().end())
-                   VERBOSE("Edge " << e[0] << ", " << e[1] << " not found in poly " << pid);
+                   CWDT_VERBOSE("Edge " << e[0] << ", " << e[1] << " not found in poly " << pid);
 
-               int v = (*eit)[0];
+               const int v = (*eit)[0];
                (*eit)[0] = nv_;
                polygons_[pid].be().insert(eit, edge{v, nv_});
 
@@ -754,7 +748,7 @@ namespace CWDT {
            ++nv_;
        }
 
-       VERBOSE("Modified " << mp.size() << "by edge splitting");
+       CWDT_VERBOSE("Modified " << mp.size() << "by edge splitting");
        std::vector<bool> af(np_, true);
 
        if (mp.size() == 0) {
@@ -798,14 +792,15 @@ namespace CWDT {
     }
 
     int processor::peel_by_winding_number(
-        double thr
+        const double thr
         ) {
-        VERBOSE("Peeling... ");
+        CWDT_VERBOSE("Peeling... ");
         Eigen::MatrixXd BC(T_.number_of_finite_cells(), 3);
 
         Finite_cells_iterator cit = T_.finite_cells_begin();
         for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti) {
-            Point c = CGAL::centroid(cit->vertex(0)->point().point(),
+            Point c = CGAL::centroid(
+                cit->vertex(0)->point().point(),
                 cit->vertex(1)->point().point(),
                 cit->vertex(2)->point().point(),
                 cit->vertex(3)->point().point());
@@ -837,14 +832,15 @@ namespace CWDT {
 
         int npt = 0;
         cit = T_.finite_cells_begin();
-        for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti)
+        for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti) {
             if (fabs(WN(ti)) > thr)
                 cit->info() = 0;
             else {
                 cit->info() = -1;
                 npt++;
             }
-        VERBOSE("done - " << npt << " tets removed");
+        }
+        CWDT_VERBOSE("done - " << npt << " tets removed");
 
         return npt;
     }
@@ -855,7 +851,7 @@ namespace CWDT {
         std::ifstream in(file_path);
 
         if (!in.good()) {
-            WARNING("Input file is not good!");
+            CWDT_WARNING("Input file is not good!");
             return false;
         }
 
@@ -900,7 +896,7 @@ namespace CWDT {
             std::istringstream iss2(line);
             int d;
             iss2 >> d;
-            if (d < 3) WARNING("Degree < 3");
+            if (d < 3) CWDT_WARNING("Degree < 3");
 
             auto id = static_cast<int*>(malloc(sizeof(int) * d));
 
@@ -961,7 +957,7 @@ namespace CWDT {
         std::ofstream out(file_path);
 
         if (!out.good()) {
-            WARNING("Output file is not good!");
+            CWDT_WARNING("Output file is not good!");
             return false;
         }
 
@@ -989,7 +985,7 @@ namespace CWDT {
         std::ofstream out(file_path);
 
         if (!out.good()) {
-            WARNING("Output file is not good!");
+            CWDT_WARNING("Output file is not good!");
             return false;
         }
 
@@ -1010,21 +1006,116 @@ namespace CWDT {
         return true;
     }
 
-    bool processor::write_tet_off(
+    bool processor::write_tets_obj(
         const std::string& file_path,
-        const double& shrink_factor
+        const double& shrink_factor,
+        const bool peel
         ) {
         std::ofstream out(file_path);
 
         if (!out.good()) {
-            WARNING("Output file is not good!");
+            CWDT_WARNING("Output file is not good!");
             return false;
         }
 
-        out << "OFF" << std::endl;
-        out << nv_ << " " << ntri() << " 0" << std::endl;
-        for (int i = 0; i < nv_; i++)
-            out << vertices_[i][0] << " " << vertices_[i][1] << " " << vertices_[i][2] << std::endl;
+        unsigned int v_cnt = 0;
+        Finite_cells_iterator cit = T_.finite_cells_begin();
+        for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti) {
+            if (peel && cit->info() == -1)
+                continue;
+
+            const auto p0 = cit->vertex(0)->point().point();
+            const auto p1 = cit->vertex(1)->point().point();
+            const auto p2 = cit->vertex(2)->point().point();
+            const auto p3 = cit->vertex(3)->point().point();
+            Point c = CGAL::centroid(
+                cit->vertex(0)->point().point(),
+                cit->vertex(1)->point().point(),
+                cit->vertex(2)->point().point(),
+                cit->vertex(3)->point().point());
+            out << "v "
+                << shrink_factor * c.x() + (1-shrink_factor) * p0.x() << " "
+                << shrink_factor * c.y() + (1-shrink_factor) * p0.y() << " "
+                << shrink_factor * c.z() + (1-shrink_factor) * p0.z() << std::endl;
+            out << "v "
+                << shrink_factor * c.x() + (1-shrink_factor) * p1.x() << " "
+                << shrink_factor * c.y() + (1-shrink_factor) * p1.y() << " "
+                << shrink_factor * c.z() + (1-shrink_factor) * p1.z() << std::endl;
+            out << "v "
+                << shrink_factor * c.x() + (1-shrink_factor) * p2.x() << " "
+                << shrink_factor * c.y() + (1-shrink_factor) * p2.y() << " "
+                << shrink_factor * c.z() + (1-shrink_factor) * p2.z() << std::endl;
+            out << "v "
+                << shrink_factor * c.x() + (1-shrink_factor) * p3.x() << " "
+                << shrink_factor * c.y() + (1-shrink_factor) * p3.y() << " "
+                << shrink_factor * c.z() + (1-shrink_factor) * p3.z() << std::endl;
+            out << "f " << v_cnt + 1 << " " << v_cnt + 2 << " " << v_cnt + 3 << std::endl;
+            out << "f " << v_cnt + 1 << " " << v_cnt + 2 << " " << v_cnt + 4 << std::endl;
+            out << "f " << v_cnt + 1 << " " << v_cnt + 3 << " " << v_cnt + 4 << std::endl;
+            out << "f " << v_cnt + 2 << " " << v_cnt + 3 << " " << v_cnt + 4 << std::endl;
+
+            v_cnt += 4;
+        }
+
+        out.close();
+
+        return true;
+    }
+
+    bool processor::write_tets_mesh(
+        const std::string& file_path
+        ) const {
+        std::ofstream out(file_path);
+
+        if (!out.good()) {
+            CWDT_WARNING("Output file is not good!");
+            return false;
+        }
+
+        unsigned int t_nb = 0;
+        unsigned int v_nb = 0;
+        std::unordered_map<Rt::Vertex_handle, unsigned int> vh_map;
+        std::vector<Point> ordered_points;
+        for (auto cit = T_.finite_cells_begin(); cit != T_.finite_cells_end(); ++cit) {
+            if (vh_map.find(cit->vertex(0)) == vh_map.end()) {
+                vh_map[cit->vertex(0)] = v_nb++;
+                ordered_points.push_back(cit->vertex(0)->point().point());
+            }
+            if (vh_map.find(cit->vertex(1)) == vh_map.end()) {
+                vh_map[cit->vertex(1)] = v_nb++;
+                ordered_points.push_back(cit->vertex(1)->point().point());
+            }
+            if (vh_map.find(cit->vertex(2)) == vh_map.end()) {
+                vh_map[cit->vertex(2)] = v_nb++;
+                ordered_points.push_back(cit->vertex(2)->point().point());
+            }
+            if (vh_map.find(cit->vertex(3)) == vh_map.end()) {
+                vh_map[cit->vertex(3)] = v_nb++;
+                ordered_points.push_back(cit->vertex(3)->point().point());
+            }
+            ++t_nb;
+        }
+
+        out << "Dimension 3" << std::endl;
+
+        out << "\nVertices" << std::endl;
+        out << v_nb << std::endl;
+        for (const auto& p : ordered_points)
+            out << p.x() << " " << p.y() << " " << p.z() << std::endl;
+
+        out << "\nTetrahedra" << std::endl;
+        out << t_nb << std::endl;
+        auto cit = T_.finite_cells_begin();
+        for (int ti = 0; cit != T_.finite_cells_end(); ++cit, ++ti) {
+            out << vh_map[cit->vertex(0)]+1 << " " << vh_map[cit->vertex(1)]+1 << " "
+                << vh_map[cit->vertex(2)]+1 << " " << vh_map[cit->vertex(3)]+1 << " ";
+            if (cit->info() == 0)
+                out << "1" << std::endl;
+            else
+                out << "2" << std::endl;
+        }
+
+        out << "\nEnd" << std::endl;
 
         out.close();
 

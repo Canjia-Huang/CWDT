@@ -1,11 +1,11 @@
 #ifndef CWDT_H
 #define CWDT_H
 
-#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <array>
 #include <iostream>
 #include <unordered_map>
 #include <vector>
+#include <CGAL/Exact_predicates_inexact_constructions_kernel.h>
 #include <CGAL/Regular_triangulation_3.h>
 #include <CGAL/Regular_triangulation_cell_base_3.h>
 #include <CGAL/Regular_triangulation_vertex_base_3.h>
@@ -64,11 +64,11 @@ namespace CWDT {
 				&& ((tv_[2] == t.tv_[0]) || (tv_[2] == t.tv_[1]) || (tv_[2] == t.tv_[2]));
 		}
 
-		int& operator[](int i) {
+		int& operator[](const int i) {
 			return tv_[i];
 		}
 
-		const int& operator[](int i) const {
+		const int& operator[](const int i) const {
 			return tv_[i];
 		}
 	private:
@@ -89,6 +89,7 @@ namespace CWDT {
 		std::vector<int>& iv() { return iv_; }
 		std::vector<triangle>& tri() { return tri_; }
 		K::Plane_3& plane() { return plane_; }
+
 	private:
 		std::list<edge> be_;
 		std::vector<int> iv_;
@@ -99,14 +100,14 @@ namespace CWDT {
 
 template<>
 struct std::hash<CWDT::edge> {
-	size_t operator()(CWDT::edge const& key) const {
+	size_t operator()(CWDT::edge const& key) const noexcept {
 		return static_cast<size_t>(key[0]) * static_cast<size_t>(key[1]);
 	}
 };
 
 template<>
 struct std::hash<CWDT::triangle> {
-	size_t operator()(CWDT::triangle const& key) const {
+	size_t operator()(CWDT::triangle const& key) const noexcept {
 		return static_cast<size_t>(key[0]) * static_cast<size_t>(key[1]) * static_cast<size_t>(key[2]);
 	}
 };
@@ -127,31 +128,39 @@ namespace CWDT {
 
 		int ntri();
 
-		/** \brief Read in constrained mesh information.
-		 * \param[in] file_path
-		 * \param[in] in: ifstream of input file
-		 * \return success or not */
+		/**
+		 * @brief Read in constrained mesh information.
+		 * @param[in] file_path
+		 * @return success or not
+		 */
 		bool read_off(const std::string& file_path);
 		bool read_igl(const std::string& file_path);
 		bool write_off(const std::string& file_path);
 		bool write_woff(const std::string& file_path);
-		bool write_tet_off(const std::string& file_path,
-			const double& shrink_factor = 1.);
+		bool write_tets_obj(
+			const std::string& file_path,
+			const double& shrink_factor = 0,
+			bool peel = true);
+		bool write_tets_mesh(
+			const std::string& file_path) const;
 
-		/** \brief Pre-compute the plane for each polygon. */
+		/** @brief Pre-compute the plane for each polygon. */
 		void compute_planes();
 
-		/** \brief Triangulate the specified polygon.
-		 * \param[in, out] p: polygon
-		 * \return the number of triangles after triangulation */
-		int triangulate_poly(poly& p);
-		int triangulate_cpoly_w(poly& p);
+		/**
+		 * @brief Triangulate the specified polygon.
+		 * @param[in, out] p polygon
+		 * @return the number of triangles after triangulation
+		 */
+		int triangulate_poly(poly& p) const;
+		int triangulate_cpoly_w(poly& p) const;
 		int triangulate();
 
-		/** \brief Get the adjacency relationship between tets, and store in tetNeighbors. */
+		/** @brief Get the adjacency relationship between tets, and store in tetNeighbors. */
 		void buildTetNeighbors();
 
-		int solve(int nr,
+		int solve(
+			int nr,
 			double mintol, double maxtol,
 			double height_factor, double weight_factor);
 
