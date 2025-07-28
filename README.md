@@ -1,5 +1,13 @@
 # Conforming Weighted Delaunay Triangulations
 
+| Input mesh | Result surface mesh | Result tetrahedral mesh (shrink: 0.3)|
+| --- | --- | --- |
+| ![image](.pic/input.png) | ![image](.pic/surface_mesh.png) | ![image](.pic/tet_shrink.png)|
+
+| Result tetrahedral mesh (in-out) | Result tetrahedral mesh (wireframe) | Result tetrahedral mesh (clipping) |
+| --- | --- | --- |
+| ![image](.pic/tet.png) | ![image](.pic/tet_wireframe.png) | ![image](.pic/tet_clip.png) |
+
 This repo is a rearrangement of the code for the work "[**Conforming Weighted Delaunay Triangulations**](https://dl.acm.org/doi/abs/10.1145/3414685.3417776)" by [Marc Alexa](https://cg.tu-berlin.de/people/marc-alexa). [[Source Code]](https://cragl.cs.gmu.edu/iheartla/evaluation/static/cases_res/Conforming%20Weighted%20Delaunay%20Triangulations/cwdt3.cc)
 
 I am attempting to make it more user-friendly and easier to use.
