@@ -98,6 +98,7 @@ int main(int argc, char** argv) {
     std::cout << "Tets: " << P.T().number_of_finite_cells() << " - " << npt << " (peeled) = " << (P.T().number_of_finite_cells() - npt) << std::endl;
 
     P.write_off(output_path + "result_surface_mesh.off");
+    P.write_woff(output_path + "result_weighted_surface_mesh.off");
     P.write_tets_obj(output_path + "result_tets.obj", shrink_factor, !not_peel);
     P.write_tets_mesh(output_path + "result_tets.mesh");
 
