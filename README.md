@@ -74,7 +74,7 @@ If you use this code in your research, **please cite the original work**:
 - [CLI11](https://github.com/CLIUtils/CLI11?tab=readme-ov-file#install) (already included)
 
 > [!NOTE]
-> The gcc version needs to be compatible with the boost version. It seems that gcc 15.1 is not compatible with boost 1.87.0... :thinking:
+> The gcc version needs to be compatible with the boost version. It seems that gcc 15.1 is not compatible with boost 1.78.0... :thinking:
 
 # :checkered_flag: Getting started
 
